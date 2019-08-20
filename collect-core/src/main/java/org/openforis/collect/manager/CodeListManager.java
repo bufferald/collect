@@ -165,9 +165,8 @@ public class CodeListManager {
 		CodeList list = attribute.getDefinition().getList();
 		boolean persistedSurvey = list.getSurvey().getId() != null;
 		Record record = attribute.getRecord();
-		ModelVersion version = record.getVersion();
 		if ( persistedSurvey && list.isExternal() ) {
-			ExternalCodeListItem item = (ExternalCodeListItem) loadItemByAttribute(attribute);
+			ExternalCodeListItem item = loadItemByAttribute(attribute);
 			return provider.getParentItem(item);
 		} else if ( persistedSurvey && list.isEmpty() ) {
 			PersistedCodeListItem lastParentItem = null;
@@ -176,19 +175,15 @@ public class CodeListManager {
 				CodeAttribute ancestor = codeAncestors.get(i);
 				Integer lastParentItemId = lastParentItem == null ? null: lastParentItem.getSystemId();
 				Code code = ancestor.getValue();
-				lastParentItem = codeListItemDao.loadItem(list, lastParentItemId, code.getCode(), version);
+				lastParentItem = codeListItemDao.loadItem(list, lastParentItemId, code.getCode(), record.getVersion());
 				if ( lastParentItem == null ) {
-					break;
+					return null;
 				}
 			}
 			return lastParentItem;
 		} else {
 			CodeAttribute codeParent = attribute.getCodeParent();
-			if ( codeParent == null ) {
-				return null;
-			} else {
-				return loadItemByAttribute(codeParent);
-			}
+			return codeParent == null ? null : loadItemByAttribute(codeParent);
 		}
 	}
 	
@@ -317,18 +312,31 @@ public class CodeListManager {
 				}
 			}
 		}
-		Record record = parent.getRecord();
-		ModelVersion version = record.getVersion();
-		return filterApplicableItems(items, version);
+		return filterApplicableItems(items, parent.getRecord());
+	}
+	
+	public <T extends CodeListItem> List<T> loadValidItemsByParentCodeListItem(
+			Record record, CodeList codeList, Integer parentCodeListItemId) {
+		List<T> items = null;
+		if (parentCodeListItemId == null) {
+			items = loadRootItems(codeList);
+		} else if (parentCodeListItemId != null) {
+			CodeListItem parentCodeListItem = loadItem(codeList, parentCodeListItemId);
+			if ( parentCodeListItem != null ) {
+				items = loadChildItems(parentCodeListItem);
+			}
+		}
+		return filterApplicableItems(items, record);
 	}
 
 	protected <T extends CodeListItem> List<T> filterApplicableItems(
-			List<T> items, ModelVersion version) {
+			List<T> items, Record record) {
 		if ( items == null ) {
 			return Collections.emptyList();
 		} else {
 			List<T> result;
-			if ( version == null ) {
+			ModelVersion version = record.getVersion();
+			if ( version== null ) {
 				result = items;
 			} else {
 				result = version.filterApplicableItems(items);

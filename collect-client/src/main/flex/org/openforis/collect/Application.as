@@ -167,7 +167,7 @@ package org.openforis.collect {
 		public static function set activeSurvey(value:SurveyProxy):void {
 			_activeSurvey = value;
 		}
-
+		
 		[Bindable]
 		public static function get activeRootEntity():EntityDefinitionProxy {
 			return _activeRootEntity;

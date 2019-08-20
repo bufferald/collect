@@ -48,17 +48,7 @@ public class NodeProxy implements Proxy {
 		List<NodeProxy> result = new ArrayList<NodeProxy>();
 		if(list != null) {
 			for (Node<?> node : list) {
-				NodeProxy proxy = fromNode(node, context);
-				if(node instanceof Attribute<?, ?>) {
-					if(node instanceof CodeAttribute) {
-						proxy = new CodeAttributeProxy(parent, (CodeAttribute) node, context);
-					} else {
-						proxy = new AttributeProxy(parent, (Attribute<?, ?>) node, context);
-					}
-				} else {
-					proxy = new EntityProxy(parent, (Entity) node, context);
-				}
-				result.add(proxy);
+				result.add(fromNode(node, context));
 			}
 		}
 		return result;

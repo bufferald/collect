@@ -149,12 +149,18 @@ package org.openforis.collect.model.proxy {
 		
 		public function get ancestors():IList {
 			var result:IList = new ArrayCollection();
+			visitAncestors(function(currentParent:EntityProxy):void {
+				result.addItemAt(currentParent, 0);
+			});
+			return result;
+		}
+		
+		public function visitAncestors(visitor:Function):void {
 			var currentParent:EntityProxy = parent;
 			while (currentParent != null) {
-				result.addItemAt(currentParent, 0);
+				visitor(currentParent);
 				currentParent = currentParent.parent;
 			}
-			return result;
 		}
 
 		public function getIndex():int {

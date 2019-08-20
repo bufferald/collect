@@ -156,15 +156,7 @@ public class RecordProxy implements Proxy {
 	
 	@ExternalizedProperty
 	public boolean isCleansingComplete() {
-		if(record.getStep() != null) {
-			switch(record.getStep()) {
-				case ANALYSIS:
-					return true;
-				default:
-					return false;
-			}
-		}
-		return false;
+		return Step.ANALYSIS == record.getStep();
 	}
 
 	public Integer getErrors() {

@@ -19,22 +19,30 @@ import org.openforis.idm.model.CodeAttribute;
 public class CodeAttributeProxy extends AttributeProxy {
 
 	private transient CodeAttribute codeAttribute;
+	private CodeListItemProxy codeListItem;
 	
 	public CodeAttributeProxy(EntityProxy parent,
 			CodeAttribute attribute, ProxyContext context) {
 		super(parent, attribute, context);
 		this.codeAttribute = attribute;
+		CodeListService codeListService = getCodeListService();
+		CodeListItem item = codeListService.loadItem(codeAttribute);
+		this.codeListItem = item == null ? null: new CodeListItemProxy(item);
 	}
 
 	@ExternalizedProperty
 	public CodeListItemProxy getCodeListItem() {
-		if ( isEnumerator() ) {
-			CodeListService codeListManager = getCodeListService();
-			CodeListItem codeListItem = codeListManager.loadItem(codeAttribute);
-			return codeListItem == null ? null: new CodeListItemProxy(codeListItem);
-		} else {
-			return null;
-		}
+		return codeListItem;
+	}
+	
+	public void setCodeListItem(CodeListItemProxy codeListItem) {
+		this.codeListItem = codeListItem;
+	}
+	
+	@ExternalizedProperty
+	public Integer getParentCodeAttributeId() {
+		CodeAttribute parentCodeAttribute = this.codeAttribute.getRecord().determineParentCodeAttribute(codeAttribute);
+		return parentCodeAttribute == null ? null : parentCodeAttribute.getInternalId();
 	}
 
 	private CodeListService getCodeListService() {

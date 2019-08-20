@@ -6,6 +6,7 @@ package org.openforis.collect.client {
 	import mx.rpc.remoting.Operation;
 	
 	import org.openforis.collect.Application;
+	import org.openforis.collect.metamodel.CodeListItemsCache;
 	import org.openforis.collect.model.CollectRecord$Step;
 	import org.openforis.collect.model.proxy.NodeChangeSetProxy;
 	import org.openforis.collect.model.proxy.NodeUpdateRequestSetProxy;
@@ -39,6 +40,8 @@ package org.openforis.collect.client {
 		private var _searchAutoCompleteValuesOperation:Operation;
 		private var _assignOwnerOperation:Operation;
 		private var _moveRecordsOperation:Operation;
+		
+		private var _codeListItemsCache:CodeListItemsCache = new CodeListItemsCache();
 		
 		public function DataClient() {
 			super("dataService");
@@ -137,10 +140,12 @@ package org.openforis.collect.client {
 			token.addResponder(responder);
 		}
 		
-		public function findAssignableCodeListItems(responder:IResponder, parentEntityId:int, attribute:String):AsyncToken {
-			var token:AsyncToken = this._findAssignableCodeListItemsOperation.send(parentEntityId, attribute);
-			token.addResponder(responder);
-			return token;
+		public function findAssignableCodeListItems(responder:IResponder, attributeDefId:int, parentCodeListItemId:int = NaN):AsyncToken {
+			_codeListItemsCache.findAssignableCodeListItems(responder, this._findAssignableCodeListItemsOperation.send, attributeDefId, parentCodeListItemId);
+			return null;
+			//var token:AsyncToken = this._findAssignableCodeListItemsOperation.send(attributeDefId, parentCodeListItemId);
+			//token.addResponder(responder);
+			//return token;
 		}
 		
 		public function getCodeListItems(responder:IResponder, parentEntityId:int, attribute:String, codes:Array):void {

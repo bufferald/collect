@@ -25,7 +25,18 @@ public class CodeAttributeDefinitionProxy extends AttributeDefinitionProxy {
 	public String getListName() {
 		return attributeDefinition.getListName();
 	}
-
+	
+	@ExternalizedProperty
+	public Integer getListLevelIndex() {
+		return attributeDefinition.getListLevelIndex();
+	}
+	
+	@ExternalizedProperty
+	public Integer getParentCodeDefinitionId() {
+		CodeAttributeDefinition parentCodeAttributeDefinition = attributeDefinition.getParentCodeAttributeDefinition();
+		return parentCodeAttributeDefinition == null ? null : parentCodeAttributeDefinition.getId();
+	}
+	
 	@ExternalizedProperty
 	public boolean isAllowUnlisted() {
 		return attributeDefinition.isAllowUnlisted();

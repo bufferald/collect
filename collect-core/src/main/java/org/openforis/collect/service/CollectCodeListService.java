@@ -85,7 +85,7 @@ public class CollectCodeListService implements CodeListService {
 	public void deleteAllItems(CodeList list) {
 		codeListManager.deleteAllItems(list);
 	}
-
+	
 	@Override
 	public <T extends CodeListItem> T loadItem(CodeAttribute attribute) {
 		return codeListManager.loadItemByAttribute(attribute);

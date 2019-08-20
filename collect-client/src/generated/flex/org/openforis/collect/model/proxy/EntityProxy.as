@@ -236,7 +236,7 @@ package org.openforis.collect.model.proxy {
 			return partialCompareResult;
 		}
 		
-		public function getChild(childDef:NodeDefinitionProxy, index:int):NodeProxy {
+		public function getChild(childDef:NodeDefinitionProxy, index:int = 0):NodeProxy {
 			var children:IList = getChildren(childDef);
 			if(children != null && children.length > index) {
 				return children.getItemAt(index) as NodeProxy;

@@ -53,6 +53,7 @@ import org.openforis.collect.model.RecordSummarySortField;
 import org.openforis.collect.model.User;
 import org.openforis.collect.model.UserGroup;
 import org.openforis.collect.model.UserInGroup;
+import org.openforis.collect.model.UserRole;
 import org.openforis.collect.model.proxy.NodeChangeSetProxy;
 import org.openforis.collect.model.proxy.NodeUpdateRequestSetProxy;
 import org.openforis.collect.model.proxy.RecordFilterProxy;
@@ -83,7 +84,6 @@ import org.openforis.idm.metamodel.EntityDefinition;
 import org.openforis.idm.metamodel.Schema;
 import org.openforis.idm.metamodel.SurveyContext;
 import org.openforis.idm.model.Entity;
-import org.openforis.idm.model.Node;
 import org.openforis.idm.model.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.annotation.Secured;
@@ -489,9 +489,9 @@ public class DataService {
 		CollectRecord record = getActiveRecord();
 		Entity parent = (Entity) record.getNodeByInternalId(parentEntityId);
 		CodeAttributeDefinition def = (CodeAttributeDefinition) parent.getDefinition().getChildDefinition(attrName);
-		List<CodeListItem> items = codeListManager.loadValidItems(parent, def);
 		List<CodeListItem> filteredItems = new ArrayList<CodeListItem>();
 		if(codes != null && codes.length > 0) {
+			List<CodeListItem> items = codeListManager.loadValidItems(parent, def);
 			//filter by specified codes
 			for (CodeListItem item : items) {
 				for (String code : codes) {
@@ -501,46 +501,24 @@ public class DataService {
 				}
 			}
 		}
-		List<CodeListItemProxy> result = CodeListItemProxy.fromList(filteredItems);
-		return result;
+		return CodeListItemProxy.fromList(filteredItems);
 	} 
 	
 	/**
 	 * Gets the code list items assignable to the specified attribute.
-	 * 
-	 * @param parentEntityId
-	 * @param attrName
-	 * @return
 	 */
 	@Secured(USER)
-	public List<CodeListItemProxy> findAssignableCodeListItems(int parentEntityId, String attrName){
-		CollectRecord record = getActiveRecord();
-		CollectSurvey survey = (CollectSurvey) record.getSurvey();
-		User user = sessionManager.getLoggedUser();
-		final UserInGroup userInGroup = userGroupManager.findUserInGroupOrDescendants(survey.getUserGroupId(), user.getId());
-		if (userInGroup == null) {
-			throw new IllegalStateException(String.format("User %s not allowed to access survey %s", user.getUsername(), survey.getName()));
-		}
-		Entity parent = (Entity) record.getNodeByInternalId(parentEntityId);
-		CodeAttributeDefinition def = (CodeAttributeDefinition) parent.getDefinition().getChildDefinition(attrName);
-		List<CodeListItem> items = codeListManager.loadValidItems(parent, def);
-		List<CodeListItem> filteredItems = new ArrayList<CodeListItem>(items);
+	public List<CodeListItemProxy> findAssignableCodeListItems(int attrDefId, Integer parentCodeListItemId) {
+		checkUserCanEditSurvey();
 		
-		//filter by user group qualifier (if any)
-		UserGroup group = userGroupManager.loadById(userInGroup.getGroupId());
-		String qualifierName = group.getQualifier1Name();
-		String listHierarchicalLevelName = def.getList().isHierarchical() ? def.getHierarchicalLevel() : def.getListName();
-		if (qualifierName != null && qualifierName.equals(listHierarchicalLevelName)) {
-			CollectionUtils.filter(filteredItems, new Predicate<CodeListItem>() {
-				public boolean evaluate(CodeListItem item) {
-					return item.getCode().equals(group.getQualifier1Value());
-				}
-			});
-		}
-		List<CodeListItemProxy> result = CodeListItemProxy.fromList(filteredItems);
-		List<Node<?>> selectedCodes = parent.getChildren(attrName);
-		CodeListItemProxy.setSelectedItems(result, selectedCodes);
-		return result;
+		CollectRecord record = getActiveRecord();
+		
+		CodeAttributeDefinition def = record.getSurvey().getSchema().getDefinitionById(attrDefId);
+		
+		List<CodeListItem> items = codeListManager.loadValidItemsByParentCodeListItem(record, def.getList(), parentCodeListItemId);
+		List<CodeListItem> filteredItems = filterCodeListItemsByUserGroupQualifier(record, def, items);
+		
+		return CodeListItemProxy.fromList(filteredItems);
 	}
 	
 	/**
@@ -557,11 +535,7 @@ public class DataService {
 		Entity parent = (Entity) record.getNodeByInternalId(parentEntityId);
 		CodeAttributeDefinition def = (CodeAttributeDefinition) parent.getDefinition().getChildDefinition(attributeName);
 		List<CodeListItem> items = codeListManager.findValidItems(parent, def, codes);
-		List<CodeListItemProxy> result = new ArrayList<CodeListItemProxy>();
-		for (CodeListItem item : items) {
-			result.add(new CodeListItemProxy(item));
-		}
-		return result;
+		return CodeListItemProxy.fromList(items);
 	}
 	
 	@Secured(USER)
@@ -621,6 +595,40 @@ public class DataService {
 				record.getId(), new Date(), userName));
 		String surveyName = record.getSurvey().getName();
 		eventQueue.publish(new RecordTransaction(surveyName, record.getId(), recordStep, events));
+	}
+	
+	private void checkUserCanEditSurvey() {
+		CollectRecord record = getActiveRecord();
+		CollectSurvey survey = (CollectSurvey) record.getSurvey();
+		User user = sessionManager.getLoggedUser();
+		if (user.getRole() != UserRole.ADMIN) {
+			UserInGroup userInGroup = userGroupManager.findUserInGroupOrDescendants(survey.getUserGroupId(), user.getId());
+			if (userInGroup == null) {
+				throw new IllegalStateException(String.format("User %s not allowed to access survey %s", user.getUsername(), survey.getName()));
+			}
+		}
+	}
+	
+	private List<CodeListItem> filterCodeListItemsByUserGroupQualifier(CollectRecord record, CodeAttributeDefinition def,
+			List<CodeListItem> items) {
+		List<CodeListItem> result = new ArrayList<CodeListItem>(items);
+		//filter by user group qualifier (if any)
+		CollectSurvey survey = (CollectSurvey) record.getSurvey();
+		User user = sessionManager.getLoggedUser();
+		UserInGroup userInGroup = userGroupManager.findUserInGroupOrDescendants(survey.getUserGroupId(), user.getId());
+		if (userInGroup != null) {
+			UserGroup group = userGroupManager.loadById(userInGroup.getGroupId());
+			String qualifierName = group.getQualifier1Name();
+			String listHierarchicalLevelName = def.getList().isHierarchical() ? def.getHierarchicalLevel() : def.getListName();
+			if (qualifierName != null && qualifierName.equals(listHierarchicalLevelName)) {
+				CollectionUtils.filter(result, new Predicate<CodeListItem>() {
+					public boolean evaluate(CodeListItem item) {
+						return item.getCode().equals(group.getQualifier1Value());
+					}
+				});
+			}
+		}
+		return result;
 	}
 	
 	protected CollectRecord getActiveRecord() {

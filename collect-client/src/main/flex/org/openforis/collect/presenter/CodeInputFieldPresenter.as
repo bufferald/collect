@@ -5,9 +5,13 @@ package org.openforis.collect.presenter {
 	import mx.rpc.AsyncResponder;
 	import mx.rpc.AsyncToken;
 	import mx.rpc.IResponder;
+	import mx.rpc.events.ResultEvent;
 	
+	import org.openforis.collect.Application;
 	import org.openforis.collect.metamodel.proxy.CodeAttributeDefinitionProxy;
+	import org.openforis.collect.metamodel.proxy.CodeListItemProxy;
 	import org.openforis.collect.model.proxy.AttributeProxy;
+	import org.openforis.collect.model.proxy.CodeAttributeProxy;
 	import org.openforis.collect.model.proxy.FieldProxy;
 	import org.openforis.collect.ui.component.input.CodeInputField;
 	import org.openforis.collect.util.CollectionUtil;
@@ -39,10 +43,18 @@ package org.openforis.collect.presenter {
 		
 		public function loadCodes(view:CodeInputField, resultHandler:Function):void {
 			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
-			var attributeName:String = codeAttributeDef.name;
 			var parentEntityId:int = view.parentEntity.id;
-			var responder:IResponder = new AsyncResponder(resultHandler, faultHandler);
-			_lastLoadCodesAsyncToken = dataClient.findAssignableCodeListItems(responder, parentEntityId, attributeName);
+			var parentCodeListItem:CodeListItemProxy = findParentCodeListItem();
+			var parentCodeListItemId:int = parentCodeListItem == null ? null : parentCodeListItem.id;
+			function loadCodesResultHandler(event:ResultEvent, token:Object = null):void {
+				var selectedCodes:Array = getSelectedCodes();
+				for each (var item:CodeListItemProxy in event.result.data) {
+					item.selected = selectedCodes.indexOf(item.code) >= 0;
+				}
+				resultHandler(event);
+			}
+			var responder:IResponder = new AsyncResponder(loadCodesResultHandler, faultHandler);
+			_lastLoadCodesAsyncToken = dataClient.findAssignableCodeListItems(responder, codeAttributeDef.id, parentCodeListItemId);
 		}
 		
 		override protected function getTextFromValue():String {
@@ -94,6 +106,35 @@ package org.openforis.collect.presenter {
 			view.visited = false;
 			view.updating = false;
 			updateView();
+		}
+		
+		private function findParentCodeListItem():CodeListItemProxy {
+			var currentParent = view.parentEntity;
+			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
+			var parentCodeAttributeDef:CodeAttributeDefinitionProxy = Application.activeSurvey.schema.getDefinitionById(codeAttributeDef.parentCodeDefinitionId) as CodeAttributeDefinitionProxy;
+			while (currentParent != null) {
+				if (currentParent.definition.id == parentCodeAttributeDef.id) {
+					var parentCodeAttribute:CodeAttributeProxy = currentParent.getChild(parentCodeAttributeDef);
+					return parentCodeAttribute.codeListItem;
+				} else {
+					currentParent = currentParent.parent;
+				}
+			}
+			return null;
+		}
+		
+		private function getSelectedCodes():Array {
+			var selectedCodes:Array = new Array();
+			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
+			var siblings:IList = view.parentEntity.getChildren(codeAttributeDef);
+			for each (var sibling:CodeAttributeProxy in siblings) {
+				var codeField:FieldProxy = sibling.getField(0);
+				var code:String = codeField.value as String
+				if (code != null && code.length > 0) {
+					selectedCodes.push(code);
+				}
+			}
+			return selectedCodes;
 		}
 	}
 }
