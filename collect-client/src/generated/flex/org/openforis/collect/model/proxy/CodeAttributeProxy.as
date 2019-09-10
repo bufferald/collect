@@ -31,5 +31,9 @@ package org.openforis.collect.model.proxy {
 			}
 		}
 		
+		public function get code():String {
+			return getField(0).value as String;
+		}
+		
     }
 }

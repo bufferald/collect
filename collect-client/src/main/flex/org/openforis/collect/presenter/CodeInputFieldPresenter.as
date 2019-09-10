@@ -12,6 +12,7 @@ package org.openforis.collect.presenter {
 	import org.openforis.collect.metamodel.proxy.CodeListItemProxy;
 	import org.openforis.collect.model.proxy.AttributeProxy;
 	import org.openforis.collect.model.proxy.CodeAttributeProxy;
+	import org.openforis.collect.model.proxy.EntityProxy;
 	import org.openforis.collect.model.proxy.FieldProxy;
 	import org.openforis.collect.ui.component.input.CodeInputField;
 	import org.openforis.collect.util.CollectionUtil;
@@ -44,17 +45,16 @@ package org.openforis.collect.presenter {
 		public function loadCodes(view:CodeInputField, resultHandler:Function):void {
 			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
 			var parentEntityId:int = view.parentEntity.id;
-			var parentCodeListItem:CodeListItemProxy = findParentCodeListItem();
-			var parentCodeListItemId:int = parentCodeListItem == null ? null : parentCodeListItem.id;
+			var ancestorCodes:Array = getAncestorCodes();
 			function loadCodesResultHandler(event:ResultEvent, token:Object = null):void {
 				var selectedCodes:Array = getSelectedCodes();
-				for each (var item:CodeListItemProxy in event.result.data) {
+				for each (var item:CodeListItemProxy in event.result) {
 					item.selected = selectedCodes.indexOf(item.code) >= 0;
 				}
 				resultHandler(event);
 			}
 			var responder:IResponder = new AsyncResponder(loadCodesResultHandler, faultHandler);
-			_lastLoadCodesAsyncToken = dataClient.findAssignableCodeListItems(responder, codeAttributeDef.id, parentCodeListItemId);
+			_lastLoadCodesAsyncToken = dataClient.findAssignableCodeListItems(responder, codeAttributeDef.id, ancestorCodes);
 		}
 		
 		override protected function getTextFromValue():String {
@@ -108,19 +108,25 @@ package org.openforis.collect.presenter {
 			updateView();
 		}
 		
-		private function findParentCodeListItem():CodeListItemProxy {
-			var currentParent = view.parentEntity;
+		private function getAncestorCodes():Array {
+			var result = new Array();
 			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
-			var parentCodeAttributeDef:CodeAttributeDefinitionProxy = Application.activeSurvey.schema.getDefinitionById(codeAttributeDef.parentCodeDefinitionId) as CodeAttributeDefinitionProxy;
-			while (currentParent != null) {
-				if (currentParent.definition.id == parentCodeAttributeDef.id) {
-					var parentCodeAttribute:CodeAttributeProxy = currentParent.getChild(parentCodeAttributeDef);
-					return parentCodeAttribute.codeListItem;
-				} else {
-					currentParent = currentParent.parent;
-				}
+			var currentCodeAttributeDef:CodeAttributeDefinitionProxy = codeAttributeDef;
+			while(!isNaN(currentCodeAttributeDef.parentCodeDefinitionId)) {
+				var parentCodeAttributeDef:CodeAttributeDefinitionProxy = Application.activeSurvey.schema.getDefinitionById(codeAttributeDef.parentCodeDefinitionId) as CodeAttributeDefinitionProxy;
+				var parentCodeAttribute:CodeAttributeProxy = findCodeAttributeInAncestors(parentCodeAttributeDef);
+				result.unshift(parentCodeAttribute.code);
+				currentCodeAttributeDef = parentCodeAttributeDef;
 			}
-			return null;
+			return result;
+		}
+		
+		private function findCodeAttributeInAncestors(codeAttributeDef:CodeAttributeDefinitionProxy):CodeAttributeProxy {
+			var ancestor:EntityProxy = view.parentEntity;
+			while (ancestor != null && ancestor.definition.id != codeAttributeDef.parent.id) {
+				ancestor = ancestor.parent;
+			}
+			return ancestor == null ? null : ancestor.getChild(codeAttributeDef) as CodeAttributeProxy;
 		}
 		
 		private function getSelectedCodes():Array {
@@ -128,8 +134,7 @@ package org.openforis.collect.presenter {
 			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
 			var siblings:IList = view.parentEntity.getChildren(codeAttributeDef);
 			for each (var sibling:CodeAttributeProxy in siblings) {
-				var codeField:FieldProxy = sibling.getField(0);
-				var code:String = codeField.value as String
+				var code:String = sibling.code;
 				if (code != null && code.length > 0) {
 					selectedCodes.push(code);
 				}

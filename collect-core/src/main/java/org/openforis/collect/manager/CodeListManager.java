@@ -315,16 +315,21 @@ public class CodeListManager {
 		return filterApplicableItems(items, parent.getRecord());
 	}
 	
-	public <T extends CodeListItem> List<T> loadValidItemsByParentCodeListItem(
-			Record record, CodeList codeList, Integer parentCodeListItemId) {
+	public <T extends CodeListItem> List<T> loadValidItemsByAncestorCodes(
+			Record record, CodeList codeList, String[] ancestorCodes) {
 		List<T> items = null;
-		if (parentCodeListItemId == null) {
+		if (ancestorCodes == null || ancestorCodes.length == 0) {
 			items = loadRootItems(codeList);
-		} else if (parentCodeListItemId != null) {
-			CodeListItem parentCodeListItem = loadItem(codeList, parentCodeListItemId);
-			if ( parentCodeListItem != null ) {
-				items = loadChildItems(parentCodeListItem);
+		} else {
+			String rootCode = ancestorCodes[0];
+			CodeListItem item = loadRootItem(codeList, rootCode, record.getVersion());
+			for (int index = 1; item != null && index < ancestorCodes.length; index ++) {
+				String code = ancestorCodes[index];
+				item = loadChildItem(item, code, record.getVersion());
 			}
+			if (item == null)
+				return Collections.emptyList();
+			else items = loadChildItems(item);
 		}
 		return filterApplicableItems(items, record);
 	}

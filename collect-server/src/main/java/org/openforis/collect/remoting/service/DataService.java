@@ -12,6 +12,7 @@ import static org.openforis.collect.model.UserRoles.USER;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -508,14 +509,19 @@ public class DataService {
 	 * Gets the code list items assignable to the specified attribute.
 	 */
 	@Secured(USER)
-	public List<CodeListItemProxy> findAssignableCodeListItems(int attrDefId, Integer parentCodeListItemId) {
+	public List<CodeListItemProxy> findAssignableCodeListItems(int attrDefId, String[] ancestorCodes) {
 		checkUserCanEditSurvey();
 		
 		CollectRecord record = getActiveRecord();
 		
 		CodeAttributeDefinition def = record.getSurvey().getSchema().getDefinitionById(attrDefId);
 		
-		List<CodeListItem> items = codeListManager.loadValidItemsByParentCodeListItem(record, def.getList(), parentCodeListItemId);
+		if (def.getLevelIndex() > ancestorCodes.length) {
+			//missing ancestor codes
+			return Collections.emptyList();
+		}
+		
+		List<CodeListItem> items = codeListManager.loadValidItemsByAncestorCodes(record, def.getList(), ancestorCodes);
 		List<CodeListItem> filteredItems = filterCodeListItemsByUserGroupQualifier(record, def, items);
 		
 		return CodeListItemProxy.fromList(filteredItems);

@@ -140,12 +140,9 @@ package org.openforis.collect.client {
 			token.addResponder(responder);
 		}
 		
-		public function findAssignableCodeListItems(responder:IResponder, attributeDefId:int, parentCodeListItemId:int = NaN):AsyncToken {
-			_codeListItemsCache.findAssignableCodeListItems(responder, this._findAssignableCodeListItemsOperation.send, attributeDefId, parentCodeListItemId);
+		public function findAssignableCodeListItems(responder:IResponder, attributeDefId:int, ancestorCodes:Array):AsyncToken {
+			_codeListItemsCache.findAssignableCodeListItems(responder, this._findAssignableCodeListItemsOperation, attributeDefId, ancestorCodes);
 			return null;
-			//var token:AsyncToken = this._findAssignableCodeListItemsOperation.send(attributeDefId, parentCodeListItemId);
-			//token.addResponder(responder);
-			//return token;
 		}
 		
 		public function getCodeListItems(responder:IResponder, parentEntityId:int, attribute:String, codes:Array):void {

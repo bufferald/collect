@@ -7,6 +7,7 @@ package org.openforis.collect.metamodel
 	import mx.rpc.AsyncResponder;
 	import mx.rpc.IResponder;
 	import mx.rpc.events.ResultEvent;
+	import mx.rpc.remoting.Operation;
 	
 	import org.openforis.collect.Application;
 	import org.openforis.collect.client.ClientFactory;
@@ -20,45 +21,57 @@ package org.openforis.collect.metamodel
 		private var loadingMap:Dictionary = new Dictionary();
 		private var loadCompleteListenersMap:Dictionary = new Dictionary();
 	
-		public function findAssignableCodeListItems(responder:IResponder, remoteFetchFunction:Function, attributeDefId:int, parentCodeListItemId:int = 0):void {
-			var key:Key = new Key(attributeDefId, parentCodeListItemId);
+		public function findAssignableCodeListItems(responder:IResponder, remoteFetchOperation:Operation, attributeDefId:int, ancestorCodes:Array):void {
+			var key:String = getKey(attributeDefId, ancestorCodes);
 			var data:IList = map[key];
-			if (data != null) {
-				responder.result(data);
-			} else if (loadingMap[key] == true) {
-				var listeners:IList = loadCompleteListenersMap[key];
-				if (listeners == null) {
-					listeners = new ArrayCollection();
-					loadCompleteListenersMap[key] = listeners;
+			
+			if (data == null) {
+				addLoadCompleteListener(key, responder);
+				
+				var loading:Boolean = loadingMap[key];
+				if (!loading) {
+					var internalResponder:IResponder = new AsyncResponder(function(event:ResultEvent, token:Object = null):void {
+						notifyLoadCompleteListeners(key, event);
+						map[key] = event.result;
+						loadingMap[key] = false;
+					}, responder.fault);
+	
+					// load items remotely
+					loadingMap[key] = true;
+					var token:AsyncToken = remoteFetchOperation.send(attributeDefId, ancestorCodes);
+					token.addResponder(internalResponder);
 				}
-				listeners.addItem(responder);
 			} else {
-				var internalResponder:IResponder = new AsyncResponder(function(event:ResultEvent):void {
-					var listeners:IList = loadCompleteListenersMap[key];
-					for each(var listener:IResponder in listeners) {
-						listener.result(event.result); 
-					}
-					listeners.clear();
-					map[key] = event.result;
-					loadingMap[key] = false;
-					loadCompleteListenersMap[key] = null;
-				}, responder.fault);
-
-				// load items remotely
-				loadingMap[key] = true;
-				var token:AsyncToken = remoteFetchFunction(attributeDefId, parentCodeListItemId);
-				token.addResponder(internalResponder);
+				responder.result(new ResultEvent(ResultEvent.RESULT, false, true, data));
 			}
 		}
-	}
-}
-
-class Key {
-	private var parentCodeListItemId:int;
-	private var attributeDefId:int;
-	
-	public function Key(attributeDefId:int, parentCodeListItemId:int) {
-		this.attributeDefId = attributeDefId;
-		this.parentCodeListItemId = parentCodeListItemId;
+		
+		private function addLoadCompleteListener(key:String, listener:IResponder):IList {
+			var listeners:IList = loadCompleteListenersMap[key];
+			if (listeners == null) {
+				listeners = new ArrayCollection();
+				loadCompleteListenersMap[key] = listeners;
+			}
+			listeners.addItem(listener);
+			return listeners;
+		}
+		
+		private function notifyLoadCompleteListeners(key:String, event:ResultEvent):void {
+			var listeners:IList = loadCompleteListenersMap[key];
+			if (listeners != null) {
+				for each(var listener:IResponder in listeners) {
+					listener.result(event); 
+				}
+				delete loadCompleteListenersMap[key];
+			}
+		}
+		
+		private function getKey(attributeDefId:int, ancestorCodes:Array):String {
+			return attributeDefId + (
+				ancestorCodes.length > 0 
+					? ("___" + ancestorCodes.join("$$$")) 
+					: ""
+			);
+		} 
 	}
 }
