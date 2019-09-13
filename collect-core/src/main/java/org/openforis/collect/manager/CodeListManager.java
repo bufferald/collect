@@ -113,22 +113,19 @@ public class CodeListManager {
 	}
 
 	protected CodeListItem getInternalCodeListItem(CodeAttribute attribute) {
-		Code code = attribute.getValue();
-		if (code != null) {
-			String codeValue = code.getCode();
-			if (StringUtils.isNotBlank(codeValue)) {
-				ModelVersion currentVersion = attribute.getRecord().getVersion();
-				CodeAttributeDefinition definition = attribute.getDefinition();
-				String parentExpression = definition.getParentExpression();
-				if (StringUtils.isBlank(parentExpression)) {
-					return getCodeListItem(definition.getList().getItems(), codeValue, currentVersion);
-				} else {
-					CodeAttribute codeParent = attribute.getCodeParent();
-					if (codeParent != null) {
-						CodeListItem codeListItemParent = loadItemByAttribute(codeParent);
-						if (codeListItemParent != null) {
-							return getCodeListItem(codeListItemParent.getChildItems(), codeValue, currentVersion);
-						}
+		String codeValue = attribute.getValue() != null ? attribute.getValue().getCode() : null;
+		if (StringUtils.isNotBlank(codeValue)) {
+			ModelVersion currentVersion = attribute.getRecord().getVersion();
+			CodeAttributeDefinition definition = attribute.getDefinition();
+			String parentExpression = definition.getParentExpression();
+			if (StringUtils.isBlank(parentExpression)) {
+				return getCodeListItem(definition.getList().getItems(), codeValue, currentVersion);
+			} else {
+				CodeAttribute codeParent = attribute.getCodeParent();
+				if (codeParent != null) {
+					CodeListItem codeListItemParent = loadItemByAttribute(codeParent);
+					if (codeListItemParent != null) {
+						return getCodeListItem(codeListItemParent.getChildItems(), codeValue, currentVersion);
 					}
 				}
 			}

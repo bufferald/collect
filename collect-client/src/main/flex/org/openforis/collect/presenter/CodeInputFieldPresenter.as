@@ -1,11 +1,13 @@
 package org.openforis.collect.presenter {
 	import mx.binding.utils.ChangeWatcher;
+	import mx.collections.ArrayCollection;
 	import mx.collections.IList;
 	import mx.events.PropertyChangeEvent;
 	import mx.rpc.AsyncResponder;
 	import mx.rpc.AsyncToken;
 	import mx.rpc.IResponder;
 	import mx.rpc.events.ResultEvent;
+	import mx.utils.ObjectUtil;
 	
 	import org.openforis.collect.Application;
 	import org.openforis.collect.metamodel.proxy.CodeAttributeDefinitionProxy;
@@ -47,11 +49,14 @@ package org.openforis.collect.presenter {
 			var parentEntityId:int = view.parentEntity.id;
 			var ancestorCodes:Array = getAncestorCodes();
 			function loadCodesResultHandler(event:ResultEvent, token:Object = null):void {
+				var list:IList = new ArrayCollection();
 				var selectedCodes:Array = getSelectedCodes();
 				for each (var item:CodeListItemProxy in event.result) {
-					item.selected = selectedCodes.indexOf(item.code) >= 0;
+					var newItem:CodeListItemProxy = CodeListItemProxy(mx.utils.ObjectUtil.clone(item));
+					newItem.selected = selectedCodes.indexOf(newItem.code) >= 0;
+					list.addItem(newItem);
 				}
-				resultHandler(event);
+				resultHandler(new ResultEvent(ResultEvent.RESULT, false, true, list));
 			}
 			var responder:IResponder = new AsyncResponder(loadCodesResultHandler, faultHandler);
 			_lastLoadCodesAsyncToken = dataClient.findAssignableCodeListItems(responder, codeAttributeDef.id, ancestorCodes);
@@ -88,7 +93,7 @@ package org.openforis.collect.presenter {
 		
 		override protected function getField():FieldProxy {
 			if (view.hasOwnProperty("attributes")) {
-				var attributes:IList = ObjectUtil.getValue(view, "attributes");
+				var attributes:IList = org.openforis.collect.util.ObjectUtil.getValue(view, "attributes");
 				if (CollectionUtil.isEmpty(attributes)) {
 					return super.getField();
 				} else {
@@ -113,9 +118,10 @@ package org.openforis.collect.presenter {
 			var codeAttributeDef:CodeAttributeDefinitionProxy = view.attributeDefinition as CodeAttributeDefinitionProxy;
 			var currentCodeAttributeDef:CodeAttributeDefinitionProxy = codeAttributeDef;
 			while(!isNaN(currentCodeAttributeDef.parentCodeDefinitionId)) {
-				var parentCodeAttributeDef:CodeAttributeDefinitionProxy = Application.activeSurvey.schema.getDefinitionById(codeAttributeDef.parentCodeDefinitionId) as CodeAttributeDefinitionProxy;
+				var parentCodeAttributeDef:CodeAttributeDefinitionProxy = 
+					Application.activeSurvey.schema.getDefinitionById(currentCodeAttributeDef.parentCodeDefinitionId) as CodeAttributeDefinitionProxy;
 				var parentCodeAttribute:CodeAttributeProxy = findCodeAttributeInAncestors(parentCodeAttributeDef);
-				result.unshift(parentCodeAttribute.code);
+				result.unshift(parentCodeAttribute == null ? null : parentCodeAttribute.code);
 				currentCodeAttributeDef = parentCodeAttributeDef;
 			}
 			return result;
